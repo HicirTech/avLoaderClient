@@ -9,21 +9,22 @@ the sidecars. Each piece runs on its own and knows nothing about the others.
 
 ## What it does
 
-Point it at the folder your downloads land in and run it. For every file of the configured
-extension it:
+Point it at your library folder and run it. Downloads arrive inside a folder per torrent, so it
+looks through those folders too. For every file of the configured extension it:
 
-1. Cleans up the name. Releases arrive named after wherever they came from -- `hhd800.com@ABC-123`,
-   `[javdb.com]ABC-123`, or with the domain spaced out to dodge filters as `h h d 8 0 0 . c o m`.
-   The library only wants `ABC-123`.
-2. Asks `avloaderServer` about the resulting code.
-3. Writes `ABC-123.nfo` into the output folder.
-
-Files are renamed **inside** the folder they are already in. Nothing is moved anywhere else.
+1. Skips it if it is too small to be a movie. Torrents carry advertising clips a few megabytes
+   long, often several with the same name. `MIN_FILE_SIZE_MB` decides where the line is.
+2. Cleans up the name and moves the file up into the library folder. Releases arrive named after
+   wherever they came from -- `hhd800.com@ABC-123`, `[javdb.com]ABC-123`, or with the domain
+   spaced out to dodge filters as `h h d 8 0 0 . c o m`. The library only wants `ABC-123`.
+3. Asks `avloaderServer` about the resulting code.
+4. Writes `ABC-123.nfo` into the output folder.
 
 ## What it does not do
 
 - It does not download anything, and it does not talk to javdb. Only `avloaderServer` does that.
-- It does not overwrite a video. A rename whose target already exists is skipped and reported.
+- It does not overwrite a video. A move whose target already exists is skipped and reported. Two
+  torrents carrying the same advertising clip hit this, which is what it is for.
 - It does not retry within a run. A name that failed is left without a `.nfo` and picked up next
   time, which is the whole retry mechanism.
 - It does not touch files whose name contains CJK characters. Those have either been through here
@@ -44,13 +45,17 @@ writes nothing.
 ## Reading the output
 
 ```
+skipped torrent-a/manko.fun.mp4 (2 MB)
 3 mp4 file(s) to process
-renamed [javdb.com]GHI-789.mp4 -> GHI-789.mp4
-left ABC-123-C.mp4 alone: ABC-123.mp4 already exists
+moved torrent-a/[javdb.com]GHI-789.mp4 -> GHI-789.mp4
+left torrent-b/ABC-123-C.mp4 alone: ABC-123.mp4 already exists
 GHI-789: wrote GHI-789.nfo
 ZZZZ-999: 404 not_found: javdb search returned no results for ZZZZ-999
 1 failed and will be retried next run: ZZZZ-999
 ```
+
+Paths are printed relative to the library folder. Most lines are moves out of a torrent folder, and
+showing only the file name would make them read as though nothing happened.
 
 A failure never produces a file. That matters more than it looks: a `.nfo` on disk is what marks a
 name as finished, so writing one from a failed lookup would retire that name for good.
@@ -68,7 +73,7 @@ src/
   app.ts                    the pipeline, in order
   config.ts                 settings and their defaults
   files/
-    find.ts                 which files are candidates
+    find.ts                 which files are candidates, and which are too small
     nameRules.ts            every filename rule, pure and testable
     rename.ts               the only code here that touches the disk
   metadata/
@@ -79,9 +84,9 @@ src/
     template.ts             the surrounding XML document
 ```
 
-The split between `nameRules.ts` and `rename.ts` is deliberate: renaming is the only thing in this
-program that can lose data, so every rule that decides a new name is a pure function with tests,
-and the part that calls `Deno.rename` is small enough to read in one go.
+The split between `nameRules.ts` and `rename.ts` is deliberate: moving files is the only thing in
+this program that can lose data, so every rule that decides a new name is a pure function with
+tests, and the part that calls `Deno.rename` is small enough to read in one go.
 
 Two rules are worth knowing before changing them. A leading `source@` or `[source]` marker is only
 stripped when it sits tight against the text, because matching the last `@` anywhere in a name
