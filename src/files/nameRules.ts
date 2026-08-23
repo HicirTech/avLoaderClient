@@ -13,6 +13,18 @@ const DOMAIN_PATTERN = /^(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,24}$
 const LEADING_DOMAIN_SOURCE_PATTERN =
   /^(?:\[)?(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,24}(?:\])?(?:[\s_-]+)?/i;
 
+/**
+ * A leading `source@` or `[source]` marker.
+ *
+ * Anchored, and the marker must sit tight against the text with no space, so a
+ * title that merely contains an "@" keeps its video code. `lastIndexOf("@")`
+ * used to be enough to turn `DEF-456 @ 4K rip` into `4K rip`.
+ *
+ * Zero leading characters is allowed because the domain rule runs first and can
+ * leave a bare `@ABC-123` behind.
+ */
+const LEADING_SOURCE_MARKER_PATTERN = /^[^\s@\]]{0,40}[@\]]\s*/;
+
 /** Suffixes marking which cut of a release this is. */
 const RELEASE_SUFFIXES = ["-CU", "-UC", "-C", "-U"];
 
@@ -43,11 +55,8 @@ export const stripLeadingWebsiteSource = (text: string): string => {
   }
 };
 
-/** Drop a `source@` or `source]` prefix, keeping the real title. */
-export const stripLeadingSourceMarker = (baseName: string): string => {
-  const marker = Math.max(baseName.lastIndexOf("@"), baseName.lastIndexOf("]"));
-  return marker >= 0 && marker < baseName.length - 1 ? baseName.slice(marker + 1) : baseName;
-};
+export const stripLeadingSourceMarker = (baseName: string): string =>
+  baseName.replace(LEADING_SOURCE_MARKER_PATTERN, "");
 
 /**
  * Drop the release-cut suffix.
