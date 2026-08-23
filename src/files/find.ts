@@ -1,42 +1,23 @@
 import { walk } from "@std/fs";
 import { basename } from "@std/path";
-import {
-  containsObfuscatedWebsite,
-  normalizeObfuscatedWebsite,
-} from "./fileNameWebsiteRules.ts";
 
-const hasChineseInFileName = (text: string): boolean => {
-  const fileName = basename(text);
-  return Boolean(fileName.match(/[\u3400-\u9FBF]/));
-};
+/**
+ * A name with CJK in it has already been through this program, or is a
+ * hand-labelled release worth leaving alone. Either way it is not a candidate.
+ */
+const hasCjkName = (path: string): boolean => /[㐀-龿]/.test(basename(path));
 
-// Function to find files with a specific extension
-export const findFilesWithoutChineseByExtension = async (
+/** Every file of the given extension that has not been processed yet. */
+export const findVideosToProcess = async (
   directory: string,
   extension: string,
-) => {
-  const files: string[] = [];
+): Promise<string[]> => {
+  const candidates: string[] = [];
 
-  for await (
-    const entry of walk(directory, { includeDirs: false, exts: [extension] })
-  ) {
-    const pathName = entry.path;
-    const fileName = basename(pathName);
-    const pathHasChinese = hasChineseInFileName(pathName);
-
-    if (!pathHasChinese) {
-      if (containsObfuscatedWebsite(fileName)) {
-        const sanitized = normalizeObfuscatedWebsite(fileName);
-        console.log(
-          `Will sanitize obfuscated website in filename: ${fileName} -> ${sanitized}`,
-        );
-      }
-      files.push(entry.path);
-      continue;
-    }
-
-    console.log(`Ignore ${entry.path}`);
+  for await (const entry of walk(directory, { includeDirs: false, exts: [extension] })) {
+    if (hasCjkName(entry.path)) continue;
+    candidates.push(entry.path);
   }
 
-  return files;
+  return candidates;
 };
