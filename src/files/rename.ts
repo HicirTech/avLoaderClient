@@ -1,4 +1,7 @@
-/** Renaming files on disk. */
+/**
+ * Renaming files on disk. The only part of this program that can lose data, so
+ * it refuses to overwrite and reports every file individually.
+ */
 
 import { basename, extname, join } from "@std/path";
 
@@ -13,6 +16,16 @@ export interface RenameOutcome {
   readonly skipped?: string;
 }
 
+const exists = async (path: string): Promise<boolean> => {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) return false;
+    throw error;
+  }
+};
+
 /** Clean up a file name, extension preserved. */
 export const normalizeFileName = (fileName: string): string => {
   const extension = extname(fileName);
@@ -26,6 +39,9 @@ export const normalizeFileName = (fileName: string): string => {
  * Nothing moves between directories despite how this reads at the call site --
  * the source and the destination have always been the same folder.
  *
+ * A target that already exists is left alone rather than overwritten. Only one
+ * cut of any movie is kept, so this should never fire; if it does, something is
+ * wrong and silently destroying the other file would be the worst answer.
  */
 export const renameInPlace = async (
   paths: readonly string[],
@@ -42,8 +58,23 @@ export const renameInPlace = async (
       continue;
     }
 
-    await Deno.rename(from, to);
-    outcomes.push({ from, to, renamed: true });
+    if (await exists(to)) {
+      outcomes.push({ from, to: from, renamed: false, skipped: `${cleaned} already exists` });
+      continue;
+    }
+
+    try {
+      await Deno.rename(from, to);
+      outcomes.push({ from, to, renamed: true });
+    } catch (error) {
+      // One unwritable file must not abandon the rest of the batch.
+      outcomes.push({
+        from,
+        to: from,
+        renamed: false,
+        skipped: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   return outcomes;
