@@ -1,6 +1,10 @@
 /**
- * Renaming files on disk. The only part of this program that can lose data, so
- * it refuses to overwrite and reports every file individually.
+ * Moving files into the library folder, cleaning up their names on the way.
+ *
+ * Downloads arrive inside a folder per torrent, so most files really do move;
+ * one already sitting in the destination is only renamed. Either way this is
+ * the only part of the program that can lose data, so it refuses to overwrite
+ * and reports every file individually.
  */
 
 import { basename, extname, join } from "@std/path";
@@ -34,16 +38,14 @@ export const normalizeFileName = (fileName: string): string => {
 };
 
 /**
- * Rename each file within its own directory.
+ * Move each file into `directory` under its cleaned-up name.
  *
- * Nothing moves between directories despite how this reads at the call site --
- * the source and the destination have always been the same folder.
- *
- * A target that already exists is left alone rather than overwritten. Only one
- * cut of any movie is kept, so this should never fire; if it does, something is
- * wrong and silently destroying the other file would be the worst answer.
+ * A target that already exists is left alone rather than overwritten. Two
+ * torrents can easily carry the same advertising clip, and only one cut of any
+ * movie is kept, so a clash means something unexpected -- silently destroying
+ * the other file would be the worst answer.
  */
-export const renameInPlace = async (
+export const collectInto = async (
   paths: readonly string[],
   directory: string,
 ): Promise<RenameOutcome[]> => {

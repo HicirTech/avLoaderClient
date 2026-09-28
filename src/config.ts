@@ -7,6 +7,8 @@ export interface AppConfig {
   extension: string;
   outputDir: string;
   delayMs: number;
+  /** Files below this are advertising, not movies. */
+  minSizeBytes: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -16,6 +18,14 @@ export const DEFAULT_CONFIG: AppConfig = {
   extension: "mp4",
   outputDir: "./output",
   delayMs: 5000,
+  minSizeBytes: 50 * 1024 * 1024,
+};
+
+const megabytes = (value: string | undefined): number | null => {
+  const parsed = Number(value);
+  return value !== undefined && Number.isFinite(parsed) && parsed >= 0
+    ? parsed * 1024 * 1024
+    : null;
 };
 
 export const loadConfig = async (): Promise<AppConfig> => {
@@ -28,5 +38,6 @@ export const loadConfig = async (): Promise<AppConfig> => {
     extension: Deno.env.get("TARGET_EXTENSION") ?? DEFAULT_CONFIG.extension,
     outputDir: Deno.env.get("OUTPUT_DIR") ?? DEFAULT_CONFIG.outputDir,
     delayMs: Number(Deno.env.get("FETCH_DELAY_MS") ?? DEFAULT_CONFIG.delayMs),
+    minSizeBytes: megabytes(Deno.env.get("MIN_FILE_SIZE_MB")) ?? DEFAULT_CONFIG.minSizeBytes,
   };
 };
